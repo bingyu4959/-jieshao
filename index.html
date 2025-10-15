@@ -1,0 +1,1558 @@
+
+<html lang="zh-CN"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>氢热电风光互补联供系统智慧房屋监测平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        success: '#00B42A',
+                        danger: '#F53F3F',
+                        dark: '#1D2129',
+                        'dark-2': '#4E5969',
+                        'light-1': '#F2F3F5',
+                        'light-2': '#E5E6EB'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .card-hover {
+                @apply hover:shadow-md hover:-translate-y-1 transition-all duration-300;
+            }
+            .tab-active {
+                @apply border-b-2 border-primary text-primary;
+            }
+            /* 移除风扇动画类 */
+            .fan-animation {
+                /* 已移除旋转动画 */
+            }
+        }
+    </style>
+    
+    <style>
+        html { scroll-behavior: smooth; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .chart-container { height: 300px; margin: 1rem 0; }
+        .energy-flow { stroke-dasharray: 10; animation: dash 15s linear infinite; }
+        @keyframes dash { to { stroke-dashoffset: 800; } }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-dark">
+    <!-- 顶部导航 -->
+    <header class="sticky top-0 z-40 bg-white shadow-sm">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+                    <i class="fa fa-bolt text-white text-xl"></i>
+                </div>
+                <h1 class="text-xl font-bold text-primary hidden sm:block">氢热电风光互补联供系统</h1>
+            </div>
+            
+            <!-- 桌面端导航 -->
+            <nav class="hidden md:flex items-center space-x-6">
+                <a href="#home" class="text-dark-2 hover:text-primary transition-colors">
+</a>
+                <a href="#introduction" class="text-dark-2 hover:text-primary transition-colors">
+</a>
+                <a href="#manual" class="text-dark-2 hover:text-primary transition-colors">
+</a>
+                <a href="#downloads" class="text-dark-2 hover:text-primary transition-colors">
+</a>
+            </nav>
+            
+            <!-- 功能按钮 -->
+            <div class="flex items-center space-x-4">
+                <button id="voice-btn" class="bg-primary/10 text-primary w-10 h-10 rounded-full flex items-center justify-center transition-colors" title="语音控制">
+                    <i class="fa fa-microphone"></i>
+                </button>
+                <button class="md:hidden text-dark-2 text-xl" id="mobile-menu-btn">
+                    <i class="fa fa-bars"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- 移动端菜单 -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-t py-3 px-4">
+            <div class="flex flex-col space-y-2">
+                <a href="#home" class="text-dark-2 hover:text-primary py-2">首页</a>
+                <a href="#introduction" class="text-dark-2 hover:text-primary py-2">项目介绍</a>
+                <a href="#manual" class="text-dark-2 hover:text-primary py-2">使用说明</a>
+                <a href="#downloads" class="text-dark-2 hover:text-primary py-2">文档下载</a>
+            </div>
+        </div>
+        
+        <!-- 语音控制弹窗 -->
+        <div id="voice-modal" class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-lg p-5 w-full max-w-md z-50">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg text-primary">语音控制</h3>
+                <button id="close-voice-modal" class="text-dark-2 hover:text-dark">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div class="text-center mb-4">
+                <div id="voice-icon" class="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                    <i class="fa fa-microphone text-primary text-2xl"></i>
+                </div>
+                <p id="voice-status" class="text-dark-2">点击麦克风开始说话</p>
+                <p class="text-xs text-dark-2/70 mt-1">支持指令：查询功率、调节光伏角度、生成报告</p>
+            </div>
+            <div class="border-t pt-3 mt-3">
+                <h4 class="text-sm font-medium mb-2">指令日志</h4>
+                <div id="voice-log" class="bg-light-1 rounded-lg p-2 text-dark-2 text-sm h-24 overflow-y-auto">
+                    <p class="text-xs text-dark-2/50 italic">暂无指令记录</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 英雄区域 -->
+    <section id="home" class="bg-gradient-to-br from-primary to-blue-500 text-white py-10 md:py-16">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row items-center">
+                <div class="md:w-1/2 mb-8 md:mb-0">
+                    <h1 class="text-[clamp(1.8rem,4vw,3rem)] font-bold leading-tight mb-4">智慧房屋能源监测与管理平台</h1>
+                    <p class="text-white/90 mb-6 max-w-lg">氢热电风光互补联供系统智慧房屋监测平台是基于Web技术构建的综合性能源管理系统，集成了光伏发电、风力发电、电解制氢、燃料电池发电等多种清洁能源技术，实现了住宅能源的自给自足与智能化管理。平台通过先进的Web技术与智能算法，实现能源的优化配置与经济效益最大化。</p>
+                    <div class="flex flex-wrap gap-3">
+                        <a href="#monitoring" class="bg-white text-primary px-5 py-2 rounded-lg font-medium hover:bg-opacity-90 transition-colors">
+                            查看示例数据 <i class="fa fa-arrow-right ml-1"></i>
+                        </a>
+                        <a href="#introduction" class="bg-white/20 text-white px-5 py-2 rounded-lg font-medium hover:bg-white/30 transition-colors">
+                            滚动了解项目
+                        </a>
+                    </div>
+                </div>
+                <div class="md:w-1/2 flex justify-center">
+                    <!-- 能源流动图 -->
+                    <svg viewBox="0 0 350 250" class="w-full max-w-sm">
+                        <!-- 房屋轮廓 -->
+                        <rect x="80" y="130" width="180" height="80" fill="white" fill-opacity="0.2" stroke="white" stroke-width="2" rx="5"></rect>
+                        <polygon points="80,130 170,80 260,130" fill="white" fill-opacity="0.2" stroke="white" stroke-width="2"></polygon>
+                        
+                        <!-- 光伏板 -->
+                        <rect id="pv-panel" x="120" y="90" width="90" height="25" fill="#FFD700" fill-opacity="0.7" stroke="white" stroke-width="1" transform-origin="165 102.5"></rect>
+                        <text x="175" y="105" font-size="9" fill="white" id="pv-angle">30°</text>
+                        
+                        <!-- 风机 -->
+                        <circle cx="300" cy="170" r="8" fill="white" fill-opacity="0.7"></circle>
+                        <line x1="300" y1="170" x2="320" y2="170" stroke="white" stroke-width="2" class="fan-spin"></line>
+                        
+                        <!-- 氢能系统 -->
+                        <circle cx="50" cy="170" r="12" fill="white" fill-opacity="0.5" stroke="white" stroke-width="2"></circle>
+                        <text x="45" y="175" font-size="9" fill="white">H₂</text>
+                        
+                        <!-- 能量流动线 -->
+                        <path d="M165,115 L165,130" stroke="white" stroke-width="2" class="energy-flow"></path>
+                        <path d="M300,170 L260,170" stroke="white" stroke-width="2" class="energy-flow"></path>
+                        <path d="M62,170 L80,170" stroke="white" stroke-width="2" class="energy-flow"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 实时监测数据 -->
+    <section id="monitoring" class="py-10 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-8">
+                <h2 class="text-[clamp(1.5rem,3vw,2rem)] font-bold text-dark mb-2">实时监测数据示例</h2>
+                <p class="text-dark-2 max-w-2xl mx-auto">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 系统每5秒刷新数据，实时监控能源生产、消耗与存储状态&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (预测模型需要接入当地系统数据库进行深度学习和强化协调)</p>
+                <button id="generate-report-btn" class="mt-4 bg-primary text-white px-5 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                    <i class="fa fa-file-text-o mr-1"></i> 生成能源报告
+                </button>
+            </div>
+            
+            <!-- 核心指标卡片 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <!-- 总功率 -->
+                <div class="bg-white rounded-xl shadow-sm border border-light-2 p-4 card-hover">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-dark-2 text-sm">总发电功率</p>
+                            <h3 class="text-2xl font-bold mt-1" id="total-power">8.6 kW</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                            <i class="fa fa-bolt"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-center text-success text-sm">
+                        <i class="fa fa-arrow-up mr-1"></i> 12.5% <span class="text-dark-2 ml-1">较昨日</span>
+                    </div>
+                </div>
+                
+                <!-- 自给率 -->
+                <div class="bg-white rounded-xl shadow-sm border border-light-2 p-4 card-hover">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-dark-2 text-sm">能源自给率</p>
+                            <h3 class="text-2xl font-bold mt-1" id="self-sufficiency">92%</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center text-success">
+                            <i class="fa fa-recycle"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-center text-success text-sm">
+                        <i class="fa fa-arrow-up mr-1"></i> 3.2% <span class="text-dark-2 ml-1">较昨日</span>
+                    </div>
+                </div>
+                
+                <!-- 氢能储量 -->
+                <div class="bg-white rounded-xl shadow-sm border border-light-2 p-4 card-hover">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-dark-2 text-sm">氢能储量</p>
+                            <h3 class="text-2xl font-bold mt-1" id="hydrogen-storage">12.5 kg</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-500">
+                            <i class="fa fa-flask"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-center text-danger text-sm">
+                        <i class="fa fa-arrow-down mr-1"></i> 5.8% <span class="text-dark-2 ml-1">较昨日</span>
+                    </div>
+                </div>
+                
+                <!-- 碳减排 -->
+                <div class="bg-white rounded-xl shadow-sm border border-light-2 p-4 card-hover">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-dark-2 text-sm">碳排放减少</p>
+                            <h3 class="text-2xl font-bold mt-1" id="carbon-reduction">46.8 kg</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-500">
+                            <i class="fa fa-leaf"></i>
+                        </div>
+                    </div>
+                    <div class="flex items-center text-success text-sm">
+                        <i class="fa fa-arrow-up mr-1"></i> 8.3% <span class="text-dark-2 ml-1">较本周</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 设备状态卡片 -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <!-- 光伏板 -->
+                <div class="bg-white rounded-xl shadow-sm border border-light-2 p-4 card-hover">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-dark-2 text-sm">光伏板状态</p>
+                            <h3 class="text-lg font-bold mt-1 text-success">运行正常</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-500">
+                            <i class="fa fa-sun-o"></i>
+                        </div>
+                    </div>
+                    <div class="space-y-1 text-dark-2 text-sm">
+                        <div class="flex justify-between"><span>当前角度</span><span id="pv-angle-val">30°</span></div>
+                        <div class="flex justify-between"><span>发电功率</span><span id="pv-power">6.8 kW</span></div>
+                        <div class="flex justify-between"><span>光照强度</span><span id="light-intensity">750 W/m²</span></div>
+                    </div>
+                </div>
+                
+                <!-- 风机 -->
+                <div class="bg-white rounded-xl shadow-sm border border-light-2 p-4 card-hover">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-dark-2 text-sm">风机状态</p>
+                            <h3 class="text-lg font-bold mt-1 text-success">运行正常</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-red-500 text-lg">
+                            <!-- 移除风扇动画类，保持静态显示 -->
+                            <i class="fa fa-asterisk"></i>
+                        </div>
+                    </div>
+                    <div class="space-y-1 text-dark-2 text-sm">
+                        <div class="flex justify-between"><span>当前转速</span><span id="fan-speed">1200 rpm</span></div>
+                        <div class="flex justify-between"><span>发电功率</span><span id="wind-power">1.5 kW</span></div>
+                        <div class="flex justify-between"><span>当前风速</span><span id="wind-speed">3.2 m/s</span></div>
+                    </div>
+                </div>
+                
+                <!-- 电解槽 -->
+                <div class="bg-white rounded-xl shadow-sm border border-light-2 p-4 card-hover">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="text-dark-2 text-sm">电解槽状态</p>
+                            <h3 class="text-lg font-bold mt-1 text-success">运行正常</h3>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-500">
+                            <i class="fa fa-flask"></i>
+                        </div>
+                    </div>
+                    <div class="space-y-1 text-dark-2 text-sm">
+                        <div class="flex justify-between"><span>运行功率</span><span id="electrolyzer-power">1.2 kW</span></div>
+                        <div class="flex justify-between"><span>制氢效率</span><span id="hydrogen-efficiency">85%</span></div>
+                        <div class="flex justify-between"><span>电网补充</span><span id="grid-supplement">8%</span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 图表区域 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- 趋势图 -->
+                <div class="bg-white rounded-xl shadow-sm border border-light-2 p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg">能源生产与消耗趋势</h3>
+                        <div class="flex space-x-2">
+                            <button class="text-sm px-3 py-1 rounded-full bg-primary/10 text-primary period-btn active" data-period="day">今日</button>
+                            <button class="text-sm px-3 py-1 rounded-full bg-light-1 text-dark-2 period-btn" data-period="week">本周</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="trend-chart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 分布饼图 -->
+                <div class="bg-white rounded-xl shadow-sm border border-light-2 p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg">能源构成分布</h3>
+                        <button class="text-primary text-sm hover:underline">查看详情</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="distribution-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 优化建议 -->
+            <div class="grid grid-cols-1 gap-4 mb-6">
+                <!-- 高优先级建议 -->
+                <div class="bg-danger/5 border border-danger/20 rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-danger flex items-center">
+                            <i class="fa fa-exclamation-triangle mr-2"></i> 高优先级建议
+                        </h4>
+                        <button class="close-suggestion text-dark-2 hover:text-dark">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    <p class="text-dark-2 text-sm">当前氢能储量<span id="suggest-hydrogen">7.2</span>kg（低于正常范围），建议降低电解槽功率至0.8kW，优先使用风电补充。</p>
+                    <button id="exec-high-suggest" class="mt-3 bg-danger text-white px-4 py-1.5 rounded-lg text-sm hover:bg-danger/90 transition-colors">
+                        一键执行
+                    </button>
+                </div>
+                
+                <!-- 常规建议 -->
+                <div class="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-primary flex items-center">
+                            <i class="fa fa-lightbulb-o mr-2"></i> 常规优化建议
+                        </h4>
+                        <button class="close-suggestion text-dark-2 hover:text-dark">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                    <p class="text-dark-2 text-sm">当前光照充足，建议将光伏板角度从<span id="suggest-pv-angle">30</span>°调节至45°，提升发电效率。</p>
+                    <button id="exec-normal-suggest" class="mt-3 bg-primary text-white px-4 py-1.5 rounded-lg text-sm hover:bg-primary/90 transition-colors">
+                        一键执行
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 能源报告 -->
+            <div id="energy-report" class="bg-white rounded-xl shadow-sm border border-light-2 p-4 hidden">
+                <h3 class="font-bold text-xl mb-4 flex items-center">
+                    <i class="fa fa-file-text text-primary mr-2"></i> 能源报告概要
+                    <span class="ml-2 text-sm text-dark-2" id="report-date"></span>
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr class="bg-light-1">
+                                <th class="px-3 py-2 text-left text-xs font-medium text-dark-2">报告维度</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-dark-2">核心数据</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-dark-2">趋势分析</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-dark-2">状态评估</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-t border-light-2">
+                                <td class="px-3 py-2 text-sm font-medium">核心指标</td>
+                                <td class="px-3 py-2 text-sm">
+                                    <p>总功率：<span id="rep-total-power">8.6 kW</span></p>
+                                    <p>自给率：<span id="rep-self-sufficiency">92%</span></p>
+                                </td>
+                                <td class="px-3 py-2 text-sm">总功率较昨日+12.5%</td>
+                                <td class="px-3 py-2 text-sm text-success">运行良好</td>
+                            </tr>
+                            <tr class="border-t border-light-2">
+                                <td class="px-3 py-2 text-sm font-medium">设备状态</td>
+                                <td class="px-3 py-2 text-sm">光伏/风机/电解槽均正常</td>
+                                <td class="px-3 py-2 text-sm">无故障告警</td>
+                                <td class="px-3 py-2 text-sm text-success">正常</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 主要内容区域 -->
+    <main class="py-10 bg-light-1">
+        <div class="container mx-auto px-4">
+            <!-- 标签页导航 -->
+            <div class="mb-6 border-b border-light-2">
+                <div class="flex space-x-6">
+                    <button id="tab-intro" class="tab-btn py-3 px-1 border-b-2 tab-active font-medium">项目介绍</button>
+                    <button id="tab-manual" class="tab-btn py-3 px-1 border-b-2 border-transparent text-dark-2 hover:text-primary font-medium">使用说明书</button>
+                    <button id="tab-down" class="tab-btn py-3 px-1 border-b-2 border-transparent text-dark-2 hover:text-primary font-medium">文档下载</button>
+                </div>
+            </div>
+            
+            <!-- 项目介绍标签页 -->
+            <div id="content-intro" class="tab-content active">
+                <section id="introduction" class="bg-white rounded-xl shadow-sm border border-light-2 p-5 mb-6">
+                    <h2 class="text-xl font-bold mb-4">项目概述</h2>
+                    <p class="text-dark-2 mb-4">氢热电风光互补联供系统智慧房屋监测平台是基于Web技术构建的综合性能源管理系统，集成了光伏发电、风力发电、电解制氢、燃料电池发电等多种清洁能源技术，实现了住宅能源的自给自足与智能化管理。平台通过先进的Web技术与智能算法，实现能源的优化配置与经济效益最大化。作品基于深度学习的风光出力预测模型，预测风光发电量的准确率超过90%；同时强化学习驱动的多能源协调调度算法，实现秒级响应。（预测模型通过多模型融合、物理信息神经网络和转移模型为基底，需要以当地数据和物联网反馈信息进行学习和修正，最终得出预测。）</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="bg-light-1 p-4 rounded-lg">
+                            <h3 class="font-bold text-lg mb-2 flex items-center">
+                                <i class="fa fa-bullseye text-primary mr-2"></i> 项目目标
+                            </h3>
+                            <ul class="space-y-1 text-dark-2 text-sm pl-5 list-disc">
+                                <li>实现多种清洁能源的高效集成与协同运行</li>
+                                <li>通过智能算法优化能源分配，提高能源利用效率</li>
+                                <li>提供直观的可视化界面，实现能源状态实时监控</li>
+                                <li>降低能源成本，减少碳排放，实现绿色环保生活</li>
+                            </ul>
+                        </div>
+                        <div class="bg-light-1 p-4 rounded-lg">
+                            <h3 class="font-bold text-lg mb-2 flex items-center">
+                                <i class="fa fa-star text-primary mr-2"></i> 核心亮点
+                            </h3>
+                            <ul class="space-y-1 text-dark-2 text-sm pl-5 list-disc">
+                                <li>多能源集成：光伏、风电、氢能系统无缝协同</li>
+                                <li>实时监控：5秒刷新一次，数据精准及时</li>
+                                <li>AI智能控制：基于算法的智能调度与优化</li>
+                                <li>经济优化：降低能源成本，提高投资回报</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+
+
+
+
+
+
+
+
+
+
+
+
+ <section class="mb-16 lazy-load">
+                    <div class="bg-white rounded-xl shadow-md p-6 md:p-8 border border-light-2">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6">技术架构</h2>
+                        
+                        <div class="mb-8">
+                            <h3 class="font-bold text-lg mb-4">前端技术栈</h3>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                                <div class="bg-light-1 p-4 rounded-lg text-center card-hover">
+                                    <i class="fa fa-html5 text-orange-500 text-2xl mb-2"></i>
+                                    <p class="text-sm">HTML5</p>
+                                </div>
+                                <div class="bg-light-1 p-4 rounded-lg text-center card-hover">
+                                    <i class="fa fa-css3 text-blue-500 text-2xl mb-2"></i>
+                                    <p class="text-sm">CSS3</p>
+                                </div>
+                                <div class="bg-light-1 p-4 rounded-lg text-center card-hover">
+                                    <i class="fa fa-code text-yellow-500 text-2xl mb-2"></i>
+                                    <p class="text-sm">JavaScript ES6+</p>
+                                </div>
+                                <div class="bg-light-1 p-4 rounded-lg text-center card-hover">
+                                    <i class="fa fa-bar-chart text-purple-500 text-2xl mb-2"></i>
+                                    <p class="text-sm">ECharts 5.4.3</p>
+                                </div>
+                                <div class="bg-light-1 p-4 rounded-lg text-center card-hover">
+                                    <i class="fa fa-cube text-green-500 text-2xl mb-2"></i>
+                                    <p class="text-sm">Three.js r128</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 物联网模块介绍 -->
+                        <div class="mb-8">
+                            <h3 class="font-bold text-lg mb-4">物联网模块架构</h3>
+                            <div class="bg-light-1 p-6 rounded-lg">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                    <div class="bg-white p-4 rounded-lg shadow-sm text-center">
+                                        <i class="fa fa-wifi text-primary text-2xl mb-2"></i>
+                                        <h4 class="font-medium mb-1">感知层</h4>
+                                        <p class="text-xs text-dark-2">光伏板传感器、风速传感器、氢能浓度传感器</p>
+                                    </div>
+                                    <div class="bg-white p-4 rounded-lg shadow-sm text-center">
+                                        <i class="fa fa-exchange text-primary text-2xl mb-2"></i>
+                                        <h4 class="font-medium mb-1">网络层</h4>
+                                        <p class="text-xs text-dark-2">MQTT协议、LoRa网关、WiFi/4G传输</p>
+                                    </div>
+                                    <div class="bg-white p-4 rounded-lg shadow-sm text-center">
+                                        <i class="fa fa-server text-primary text-2xl mb-2"></i>
+                                        <h4 class="font-medium mb-1">应用层</h4>
+                                        <p class="text-xs text-dark-2">设备控制、数据存储、智能分析</p>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-dark-2">
+                                    物联网模块实现“传感器数据采集→远程传输→平台分析→设备控制”闭环，支持每3秒更新一次设备状态，
+                                    并提供故障自动报警功能（如光伏板遮挡、风机异常振动）。
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="font-bold text-lg mb-4">系统特点</h3>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-light-2">
+                                    <thead>
+                                        <tr>
+                                            <th class="px-6 py-3 bg-light-1 text-left text-xs font-medium text-dark-2 uppercase tracking-wider">特点</th>
+                                            <th class="px-6 py-3 bg-light-1 text-left text-xs font-medium text-dark-2 uppercase tracking-wider">说明</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-light-2">
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="font-medium text-dark">纯前端实现</div>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-dark-2">
+                                                无需后端服务器支持，可本地运行，降低部署成本
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="font-medium text-dark">响应式设计</div>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-dark-2">
+                                                适配桌面、平板和手机等多种设备，提供一致的用户体验
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="font-medium text-dark">实时数据监控</div>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-dark-2">
+                                                数据每5秒自动刷新，实时掌握系统运行状态
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="font-medium text-dark">模块化架构</div>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-dark-2">
+                                                代码结构清晰，便于维护和功能扩展
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="font-medium text-dark">高可视化</div>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-dark-2">
+                                                通过图表、动画等方式直观展示能源数据和系统状态
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <section class="mb-16 lazy-load">
+                    <div class="bg-white rounded-xl shadow-md p-6 md:p-8 border border-light-2">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6">核心功能</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                            <div>
+                                <h3 class="font-bold text-lg mb-4 flex items-center">
+                                    <i class="fa fa-dashboard text-primary mr-2"></i> 实时监控
+                                </h3>
+                                <ul class="space-y-3 text-dark-2">
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>设备状态监控：光伏板、风机、电解槽等设备运行状态</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>能量流动可视化：直观展示能源生产、存储和消耗路径</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>环境参数监测：温度、湿度、光照强度、风速等数据</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>KPI仪表盘：总发电功率、自给率、碳减排量等关键指标</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h3 class="font-bold text-lg mb-4 flex items-center">
+                                    <i class="fa fa-sliders text-primary mr-2"></i> 智能控制
+                                </h3>
+                                <ul class="space-y-3 text-dark-2">
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>设备远程调节：光伏板角度、风机转速、电解槽功率等</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>多调度模式：经济优先、环保优先、可靠性优先等</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>自动运行：根据预设策略和实时数据自动调整运行参数</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>应急保护：异常情况下自动停机保护，避免设备损坏</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <h3 class="font-bold text-lg mb-4 flex items-center">
+                                    <i class="fa fa-line-chart text-primary mr-2"></i> 数据分析
+                                </h3>
+                                <ul class="space-y-3 text-dark-2">
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>历史数据查询：按日、周、月、年查看能源生产和消耗数据</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>趋势分析：生成能源生产、消耗、存储的趋势图表</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>性能评估：设备效率分析，系统整体性能评估</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>AI预测：基于历史数据和天气预报的发电量和负荷预测</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h3 class="font-bold text-lg mb-4 flex items-center">
+                                    <i class="fa fa-bell text-primary mr-2"></i> 告警管理
+                                </h3>
+                                <ul class="space-y-3 text-dark-2">
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>三级告警机制：严重告警、警告和提示信息</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>实时通知：系统异常时通过多种方式及时通知用户</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>告警阈值自定义：用户可根据需求设置各类告警阈值</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-circle text-xs text-primary mt-1.5 mr-2"></i>
+                                        <span>历史告警查询：查看历史告警记录，分析问题原因</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <section class="mb-16 lazy-load">
+                    <div class="bg-white rounded-xl shadow-md p-6 md:p-8 border border-light-2">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6">系统优势</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="border border-light-2 rounded-xl p-6 card-hover">
+                                <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4">
+                                    <i class="fa fa-microchip text-xl"></i>
+                                </div>
+                                <h3 class="font-bold text-lg mb-3">技术优势</h3>
+                                <ul class="space-y-2 text-dark-2 text-sm">
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>采用先进Web技术栈，性能优异</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>高可视化界面，数据直观易懂</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>强实时性，数据更新及时</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>跨平台兼容，多设备支持</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div class="border border-light-2 rounded-xl p-6 card-hover">
+                                <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4">
+                                    <i class="fa fa-cogs text-xl"></i>
+                                </div>
+                                <h3 class="font-bold text-lg mb-3">功能优势</h3>
+                                <ul class="space-y-2 text-dark-2 text-sm">
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>全面监控，系统状态一目了然</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>智能分析，辅助决策优化</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>灵活控制，多种运行模式</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>经济优化，降低能源成本</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div class="border border-light-2 rounded-xl p-6 card-hover">
+                                <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4">
+                                    <i class="fa fa-building text-xl"></i>
+                                </div>
+                                <h3 class="font-bold text-lg mb-3">应用优势</h3>
+                                <ul class="space-y-2 text-dark-2 text-sm">
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>部署简单，维护方便</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>扩展性强，可按需定制</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>成本低廉，投资回报快</span>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fa fa-check text-success mt-1 mr-2"></i>
+                                        <span>环保节能，符合绿色发展</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <section class="lazy-load">
+                    <div class="bg-white rounded-xl shadow-md p-6 md:p-8 border border-light-2">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6">创新亮点</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- 创新亮点1：统一样式图标 -->
+                            <div class="flex">
+                                <div class="mr-4 icon-container">
+                                    <i class="fa fa-exchange text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-lg mb-2">能量流动可视化</h3>
+                                    <p class="text-dark-2">通过SVG动画技术直观展示能源从生产、存储到消耗的完整路径，用户可以清晰了解系统能量流向。支持实时动态效果，能量流动过程与实际生产消耗同步。</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 创新亮点2：统一样式图标（机器人SVG） -->
+                            <div class="flex">
+                                <div class="mr-4 icon-container">
+                                    <svg class="w-6 h-6" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                        <!-- 头部 -->
+                                        <rect x="20" y="10" width="60" height="60" rx="10" fill="#000000 fill-opacity="0.8"></rect>
+                                        <!-- 天线 -->
+                                        <line x1="50" y1="10" x2="50" y2="0" stroke="#000000" stroke-width="2"></line>
+                                        <circle cx="50" cy="0" r="2" fill="#000000"></circle>
+                                        <!-- 眼睛 -->
+                                        <circle cx="35" cy="35" r="5" fill="#FFFFFF" class="robot-eye"></circle>
+                                        <circle cx="65" cy="35" r="5" fill="#FFFFFF" class="robot-eye"></circle>
+                                        <!-- 嘴巴 -->
+                                        <rect x="40" y="55" width="20" height="5" rx="2" fill="#000000"></rect>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-lg mb-2">AI智能预测</h3>
+                                    <p class="text-dark-2">基于历史数据和天气预报，通过智能算法预测未来24小时发电量和能源需求。结合用户用电习惯，自动生成最优调度策略，提高系统运行效率。</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 创新亮点3：统一样式图标 -->
+                            <div class="flex">
+                                <div class="mr-4 icon-container">
+                                    <i class="fa fa-mobile text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-lg mb-2">移动端适配</h3>
+                                    <p class="text-dark-2">完全响应式设计，支持在手机、平板等移动设备上流畅操作。针对触摸交互优化，支持滑动切换图表、双击缩放数据、长按查看详情等手势操作。</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 创新亮点4：统一样式图标 -->
+                            <div class="flex">
+                                <div class="mr-4 icon-container">
+                                    <i class="fa fa-cubes text-xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-lg mb-2">多维度分析</h3>
+                                    <p class="text-dark-2">从技术（设备效率）、经济（能源成本）和环保（碳减排）三个维度进行系统分析，提供全面评估报告。零部署成本，纯前端实现数据处理与可视化。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            
+            <!-- 使用说明书标签页 -->
+            <div id="content-manual" class="tab-content hidden">
+                <section id="manual" class="mb-16 lazy-load">
+                    <div class="bg-white rounded-xl shadow-md p-6 md:p-8 border border-light-2">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6">系统要求</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <h3 class="font-bold text-lg mb-4 flex items-center">
+                                    <i class="fa fa-microchip text-primary mr-2"></i> 硬件要求
+                                </h3>
+                                
+                                <div class="mb-6">
+                                    <h4 class="font-medium text-dark mb-2">最低配置</h4>
+                                    <ul class="space-y-2 text-dark-2 pl-6">
+                                        <li class="flex items-start">
+                                            <i class="fa fa-circle text-xs text-dark-2 mt-1.5 mr-2"></i>
+                                            <span>处理器：Intel Core i3 或同等性能处理器</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fa fa-circle text-xs text-dark-2 mt-1.5 mr-2"></i>
+                                            <span>内存：4GB RAM</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fa fa-circle text-xs text-dark-2 mt-1.5 mr-2"></i>
+                                            <span>存储：至少500MB可用空间</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fa fa-circle text-xs text-dark-2 mt-1.5 mr-2"></i>
+                                            <span>网络：稳定的宽带连接</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-medium text-dark mb-2">推荐配置</h4>
+                                    <ul class="space-y-2 text-dark-2 pl-6">
+                                        <li class="flex items-start">
+                                            <i class="fa fa-circle text-xs text-dark-2 mt-1.5 mr-2"></i>
+                                            <span>处理器：Intel Core i5 或同等性能处理器</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fa fa-circle text-xs text-dark-2 mt-1.5 mr-2"></i>
+                                            <span>内存：8GB RAM 或更高</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fa fa-circle text-xs text-dark-2 mt-1.5 mr-2"></i>
+                                            <span>存储：1GB 或更多可用空间</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fa fa-circle text-xs text-dark-2 mt-1.5 mr-2"></i>
+                                            <span>网络：10Mbps 或更快的宽带连接</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h3 class="font-bold text-lg mb-4 flex items-center">
+                                    <i class="fa fa-browser text-primary mr-2"></i> 软件要求
+                                </h3>
+                                
+                                <div class="mb-6">
+                                    <h4 class="font-medium text-dark mb-2">支持的浏览器</h4>
+                                    <ul class="space-y-3 text-dark-2">
+                                        <li class="flex items-center">
+                                            <i class="fa fa-chrome text-red-500 mr-3 text-xl"></i>
+                                            <span>Google Chrome 90.0 或更高版本（推荐）</span>
+                                        </li>
+                                        <li class="flex items-center">
+                                            <i class="fa fa-firefox text-orange-500 mr-3 text-xl"></i>
+                                            <span>Mozilla Firefox 88.0 或更高版本</span>
+                                        </li>
+                                        <li class="flex items-center">
+                                            <i class="fa fa-safari text-blue-500 mr-3 text-xl"></i>
+                                            <span>Apple Safari 14.0 或更高版本</span>
+                                        </li>
+                                        <li class="flex items-center">
+                                            <i class="fa fa-edge text-green-500 mr-3 text-xl"></i>
+                                            <span>Microsoft Edge 90.0 或更高版本</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-medium text-dark mb-2">浏览器设置</h4>
+                                    <ul class="space-y-2 text-dark-2 pl-6">
+                                        <li class="flex items-start">
+                                            <i class="fa fa-check-circle text-success mt-1 mr-2"></i>
+                                            <span>需启用 JavaScript 功能</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fa fa-check-circle text-success mt-1 mr-2"></i>
+                                            <span>需支持并启用 WebGL</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fa fa-check-circle text-success mt-1 mr-2"></i>
+                                            <span>建议启用浏览器缓存以提高性能</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <section class="mb-16 lazy-load">
+                    <div class="bg-white rounded-xl shadow-md p-6 md:p-8 border border-light-2">
+                        <h2 class="text-2xl md:text-3xl font-bold mb-6">安装部署</h2>
+                        
+                        <div class="mb-8">
+                            <h3 class="font-bold text-lg mb-4">本地部署（适用于个人使用）</h3>
+                            
+                            <div class="bg-light-1 rounded-lg p-4 mb-4">
+                                <p class="font-medium mb-2">步骤1：下载项目文件</p>
+                                <p class="text-dark-2">从官方网站下载最新版本的安装包，解压到本地文件夹。</p>
+                            </div>
+                            
+                            <div class="bg-light-1 rounded-lg p-4 mb-4">
+                                <p class="font-medium mb-2">步骤2：启动应用</p>
+                                <p class="text-dark-2">双击解压文件夹中的"index.html"文件，系统会自动在默认浏览器中打开。</p>
+                            </div>
+                            
+                            <div class="bg-light-1 rounded-lg p-4">
+                                <p class="font-medium mb-2">步骤3：初始设置</p>
+                                <p class="text-dark-2">首次打开系统时，需要完成基本配置向导，包括设备连接、网络设置等。</p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="font-bold text-lg mb-4">服务器部署（适用于企业级应用）</h3>
+                            
+                            <div class="bg-light-1 rounded-lg p-4 mb-4">
+                                <p class="font-medium mb-2">步骤1：准备服务器环境</p>
+                                <p class="text-dark-2">确保服务器已安装Web服务器软件（如Nginx、Apache等），并配置好基本运行环境。</p>
+                            </div>
+                            
+                            <div class="bg-light-1 rounded-lg p-4 mb-4">
+                                <p class="font-medium mb-2">步骤2：上传文件</p>
+                                <p class="text-dark-2">将解压后的所有文件上传到Web服务器的根目录或指定目录。</p>
+                            </div>
+                            
+                            <div class="bg-light-1 rounded-lg p-4">
+                                <p class="font-medium mb-2">步骤3：配置与访问</p>
+                                <p class="text-dark-2">根据服务器配置，通过域名或IP地址访问系统。管理员可通过"admin.html"进入管理界面进行系统配置。</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- 更多内容会在用户滚动到视图时加载 -->
+            </div>
+            
+
+
+ <div id="content-down" class="tab-content bg-white rounded-xl shadow-sm border border-light-2 p-6">
+                <h2 class="text-2xl font-bold mb-6">文档下载中心</h2>
+                <p class="text-dark-2 mb-8">
+                    以下是系统相关的技术文档、用户手册和资料下载，如需其他文档或帮助，请联系技术支持。
+                </p>
+                
+                <!-- 文档列表 - 完整内容 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <!-- 文档1 -->
+                    <div class="border border-light-2 rounded-xl p-6 flex items-start card-hover">
+                        <div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mr-4 flex-shrink-0">
+                            <i class="fa fa-file-pdf-o text-xl"></i>
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="font-bold text-lg mb-1">项目介绍文档</h3>
+                            <p class="text-dark-2 text-sm mb-3">完整的项目概述、技术架构和功能介绍</p>
+                            <div class="flex items-center justify-between">
+                                <div class="text-xs text-dark-2">
+                                    <span>版本：v1.2</span> · <span>大小：2.4 MB</span> · <span>格式：PDF</span>
+                                </div>
+                                <button class="text-primary hover:text-primary/80 transition-colors download-btn">
+                                    <i class="fa fa-download mr-1"></i> 下载
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 文档2 -->
+                    <div class="border border-light-2 rounded-xl p-6 flex items-start card-hover">
+                        <div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mr-4 flex-shrink-0">
+                            <i class="fa fa-file-pdf-o text-xl"></i>
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="font-bold text-lg mb-1">使用说明书</h3>
+                            <p class="text-dark-2 text-sm mb-3">详细的操作指南、故障排除和维护说明</p>
+                            <div class="flex items-center justify-between">
+                                <div class="text-xs text-dark-2">
+                                    <span>版本：v1.0</span> · <span>大小：1.8 MB</span> · <span>格式：PDF</span>
+                                </div>
+                                <button class="text-primary hover:text-primary/80 transition-colors download-btn">
+                                    <i class="fa fa-download mr-1"></i> 下载
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 文档3 -->
+                    <div class="border border-light-2 rounded-xl p-6 flex items-start card-hover">
+                        <div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mr-4 flex-shrink-0">
+                            <i class="fa fa-file-word-o text-xl"></i>
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="font-bold text-lg mb-1">技术文档</h3>
+                            <p class="text-dark-2 text-sm mb-3">系统架构、API接口和开发指南</p>
+                            <div class="flex items-center justify-between">
+                                <div class="text-xs text-dark-2">
+                                    <span>版本：v2.1</span> · <span>大小：3.2 MB</span> · <span>格式：Word</span>
+                                </div>
+                                <button class="text-primary hover:text-primary/80 transition-colors download-btn">
+                                    <i class="fa fa-download mr-1"></i> 下载
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 文档4 -->
+                    <div class="border border-light-2 rounded-xl p-6 flex items-start card-hover">
+                        <div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mr-4 flex-shrink-0">
+                            <i class="fa fa-file-video-o text-xl"></i>
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="font-bold text-lg mb-1">视频教程</h3>
+                            <p class="text-dark-2 text-sm mb-3">功能演示和操作指导视频</p>
+                            <div class="flex items-center justify-between">
+                                <div class="text-xs text-dark-2">
+                                    <span>版本：v1.0</span> · <span>大小：256 MB</span> · <span>格式：MP4</span>
+                                </div>
+                                <button class="text-primary hover:text-primary/80 transition-colors download-btn">
+                                    <i class="fa fa-download mr-1"></i> 下载
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 技术支持信息 -->
+                <div class="bg-light-1 p-6 rounded-lg border border-light-2">
+                    <h3 class="font-bold text-lg mb-4">技术支持</h3>
+                    <p class="text-dark-2 mb-4">
+                        如果您在文档使用过程中有任何问题，或需要其他相关资料，请通过以下方式联系我们：
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="flex items-center">
+                            <i class="fa fa-envelope text-primary mr-3"></i>
+                            <span class="text-dark-2">示例邮箱</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fa fa-phone text-primary mr-3"></i>
+                            <span class="text-dark-2">示例电话</span>
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fa fa-clock-o text-primary mr-3"></i>
+                            <span class="text-dark-2">示例工作时间</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+
+
+
+
+
+
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-6">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <div>
+                    <div class="flex items-center space-x-2 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-white flex items-center justify-center">
+                            <i class="fa fa-bolt text-primary text-xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold">氢热电风光互补联供系统</h3>
+                    </div>
+                    <p class="text-white/70 text-sm">打造绿色智慧生活，实现能源自给自足与智能化管理。</p>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-3">联系我们</h4>
+                    <ul class="space-y-2 text-white/70 text-sm">
+                        <li class="flex items-center"><i class="fa fa-map-marker mr-2 w-4 text-center"></i> 示例地址</li>
+                        <li class="flex items-center"><i class="fa fa-envelope mr-2 w-4 text-center"></i> 示例邮箱</li>
+                        <li class="flex items-center"><i class="fa fa-phone mr-2 w-4 text-center"></i> 示例电话</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-white/10 pt-4 text-center text-white/50 text-xs">
+                <p>© 2025 氢热电风光互补联供系统智慧房屋监测平台 版权所有</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+ // 标签页切换功能 - 简化且可靠
+        function switchTab(tabId) {
+            // 隐藏所有标签内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // 移除所有标签按钮的活跃状态
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('border-transparent', 'text-dark-2');
+            });
+            
+            // 显示选中的标签内容
+            const targetContent = document.getElementById('content-' + tabId);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+            
+            // 激活选中的标签按钮
+            const targetBtn = document.getElementById('tab-' + tabId);
+            if (targetBtn) {
+                targetBtn.classList.add('tab-active');
+                targetBtn.classList.remove('border-transparent', 'text-dark-2');
+            }
+            
+            // 滚动到标签内容区域
+            setTimeout(() => {
+                const mainContent = document.querySelector('main');
+                if (mainContent) {
+                    mainContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100);
+        }
+        
+        // 移动端菜单切换
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+        
+        // 下载按钮功能
+        document.querySelectorAll('.download-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i> 下载中...';
+                
+                // 模拟下载过程
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fa fa-check mr-1"></i> 已下载';
+                    this.classList.add('text-success');
+                    
+                    // 2秒后恢复按钮状态
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.classList.remove('text-success');
+                    }, 2000);
+                }, 1500);
+            });
+        });
+
+
+        // 全局变量
+        let trendChart, distributionChart;
+        let isVoiceListening = false;
+        let speechRecognition;
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initTabs();          // 标签页切换
+            initMobileMenu();    // 移动端菜单
+            initCharts();        // 图表初始化
+            initDataUpdate();    // 数据定时更新
+            initSuggestions();   // 优化建议交互
+            initVoiceControl();  // 语音控制初始化
+            initReport();        // 报告生成
+        });
+        
+        // 标签页切换
+        function initTabs() {
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // 切换按钮状态
+                    tabBtns.forEach(b => {
+                        b.classList.remove('tab-active');
+                        b.classList.add('border-transparent', 'text-dark-2');
+                    });
+                    this.classList.add('tab-active');
+                    this.classList.remove('border-transparent', 'text-dark-2');
+                    
+                    // 切换内容
+                    const targetId = 'content-' + this.id.split('-')[1];
+                    tabContents.forEach(content => {
+                        content.classList.remove('active');
+                    });
+                    document.getElementById(targetId).classList.add('active');
+                });
+            });
+        }
+        
+        // 移动端菜单
+        function initMobileMenu() {
+            const menuBtn = document.getElementById('mobile-menu-btn');
+            const mobileMenu = document.getElementById('mobile-menu');
+            
+            menuBtn.addEventListener('click', function() {
+                mobileMenu.classList.toggle('hidden');
+            });
+        }
+        
+        // 图表初始化
+        function initCharts() {
+            // 趋势图
+            const trendCtx = document.getElementById('trend-chart').getContext('2d');
+            trendChart = new Chart(trendCtx, {
+                type: 'line',
+                data: getTrendData('day'),
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 500 },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { beginAtZero: true, title: { display: true, text: '功率 (kW)' } }
+                    },
+                    plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } }
+                }
+            });
+            
+            // 分布饼图
+            const distCtx = document.getElementById('distribution-chart').getContext('2d');
+            distributionChart = new Chart(distCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['光伏发电', '风力发电', '氢能发电', '电网补充'],
+                    datasets: [{
+                        data: [68, 15, 9, 8],
+                        backgroundColor: ['#FFD700', '#36BFFA', '#F53F3F', '#86909C'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 500 },
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } },
+                    cutout: '65%'
+                }
+            });
+            
+            // 时间段切换
+            const periodBtns = document.querySelectorAll('.period-btn');
+            periodBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    periodBtns.forEach(b => b.classList.remove('bg-primary/10', 'text-primary'));
+                    this.classList.add('bg-primary/10', 'text-primary');
+                    trendChart.data = getTrendData(this.dataset.period);
+                    trendChart.update('none');
+                    requestAnimationFrame(() => trendChart.update());
+                });
+            });
+        }
+        
+        // 获取趋势图数据
+        function getTrendData(period) {
+            let labels, pvData, windData, consumptionData;
+            
+            if (period === 'day') {
+                labels = ['00:00', '06:00', '12:00', '18:00'];
+                pvData = [0, 3.5, 7.2, 2.8];
+                windData = [2.1, 1.2, 0.8, 1.9];
+                consumptionData = [1.2, 2.5, 4.5, 3.8];
+            } else {
+                labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+                pvData = [45, 52, 60, 48, 55, 62, 58];
+                windData = [18, 22, 15, 25, 20, 12, 18];
+                consumptionData = [42, 48, 55, 45, 50, 58, 52];
+            }
+            
+            return {
+                labels: labels,
+                datasets: [
+                    { label: '光伏发电', data: pvData, borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.1)', tension: 0.4, fill: true },
+                    { label: '风力发电', data: windData, borderColor: '#36BFFA', backgroundColor: 'rgba(54,191,250,0.1)', tension: 0.4, fill: true },
+                    { label: '房屋消耗', data: consumptionData, borderColor: '#86909C', borderDash: [5,5], fill: false }
+                ]
+            };
+        }
+        
+        // 数据定时更新
+        function initDataUpdate() {
+            // 初始基础数据
+            const baseData = {
+                totalPower: 8.6,
+                selfSufficiency: 92,
+                hydrogenStorage: 12.5,
+                carbonReduction: 46.8,
+                pvAngle: 30,
+                pvPower: 6.8,
+                lightIntensity: 750,
+                fanSpeed: 1200,
+                windPower: 1.5,
+                windSpeed: 3.2,
+                electrolyzerPower: 1.2,
+                hydrogenEfficiency: 85,
+                gridSupplement: 8
+            };
+            
+            // 每5秒更新一次数据
+            setInterval(() => {
+                const newData = {
+                    totalPower: (baseData.totalPower * (1 + (Math.random() * 0.05 * 2 - 0.05))).toFixed(1),
+                    selfSufficiency: Math.round(baseData.selfSufficiency * (1 + (Math.random() * 0.02 * 2 - 0.02))),
+                    hydrogenStorage: (baseData.hydrogenStorage * (1 + (Math.random() * 0.03 * 2 - 0.03))).toFixed(1),
+                    pvPower: (baseData.pvPower * (1 + (Math.random() * 0.08 * 2 - 0.08))).toFixed(1),
+                    windPower: (baseData.windPower * (1 + (Math.random() * 0.1 * 2 - 0.1))).toFixed(1),
+                    electrolyzerPower: (baseData.electrolyzerPower * (1 + (Math.random() * 0.05 * 2 - 0.05))).toFixed(1)
+                };
+                
+                // 更新DOM
+                document.getElementById('total-power').textContent = `${newData.totalPower} kW`;
+                document.getElementById('self-sufficiency').textContent = `${newData.selfSufficiency}%`;
+                document.getElementById('hydrogen-storage').textContent = `${newData.hydrogenStorage} kg`;
+                document.getElementById('pv-power').textContent = `${newData.pvPower} kW`;
+                document.getElementById('wind-power').textContent = `${newData.windPower} kW`;
+                document.getElementById('electrolyzer-power').textContent = `${newData.electrolyzerPower} kW`;
+                
+                // 更新建议数据
+                document.getElementById('suggest-hydrogen').textContent = newData.hydrogenStorage;
+                document.getElementById('suggest-pv-angle').textContent = baseData.pvAngle;
+                
+                // 小幅更新图表
+                if (Math.random() > 0.8) {
+                    trendChart.data.datasets[0].data = trendChart.data.datasets[0].data.map(val => 
+                        (val * (1 + (Math.random() * 0.03 * 2 - 0.03))).toFixed(1)
+                    );
+                    trendChart.update('none');
+                }
+            }, 5000);
+        }
+        
+        // 优化建议交互
+        function initSuggestions() {
+            // 关闭建议
+            document.querySelectorAll('.close-suggestion').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    this.closest('div[class*="bg-"]').style.display = 'none';
+                });
+            });
+            
+            // 执行高优先级建议
+            document.getElementById('exec-high-suggest').addEventListener('click', function() {
+                document.getElementById('electrolyzer-power').textContent = '0.8 kW';
+                this.closest('div[class*="bg-danger"]').style.display = 'none';
+            });
+            
+            // 执行常规建议
+            document.getElementById('exec-normal-suggest').addEventListener('click', function() {
+                document.getElementById('pv-angle-val').textContent = '45°';
+                document.getElementById('suggest-pv-angle').textContent = '45';
+                this.closest('div[class*="bg-primary"]').style.display = 'none';
+            });
+        }
+        
+        // 语音控制
+        function initVoiceControl() {
+            const voiceBtn = document.getElementById('voice-btn');
+            const voiceModal = document.getElementById('voice-modal');
+            const closeVoiceModal = document.getElementById('close-voice-modal');
+            const voiceIcon = document.getElementById('voice-icon');
+            const voiceStatus = document.getElementById('voice-status');
+            const voiceLog = document.getElementById('voice-log');
+            
+            // 打开弹窗
+            voiceBtn.addEventListener('click', function() {
+                voiceModal.classList.toggle('hidden');
+            });
+            
+            // 关闭弹窗
+            closeVoiceModal.addEventListener('click', function() {
+                voiceModal.classList.add('hidden');
+                if (isVoiceListening && speechRecognition) {
+                    speechRecognition.stop();
+                    isVoiceListening = false;
+                    updateVoiceUI(false);
+                }
+            });
+            
+            // 点击麦克风开始识别
+            voiceIcon.addEventListener('click', function() {
+                if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+                    voiceStatus.textContent = '浏览器不支持语音识别';
+                    return;
+                }
+                
+                if (isVoiceListening) {
+                    // 停止识别
+                    speechRecognition.stop();
+                    isVoiceListening = false;
+                    updateVoiceUI(false);
+                } else {
+                    // 开始识别
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    speechRecognition = new SpeechRecognition();
+                    speechRecognition.lang = 'zh-CN';
+                    speechRecognition.interimResults = false;
+                    
+                    // 识别开始
+                    speechRecognition.onstart = function() {
+                        isVoiceListening = true;
+                        updateVoiceUI(true);
+                        voiceStatus.textContent = '正在聆听...请说话';
+                    };
+                    
+                    // 识别结果
+                    speechRecognition.onresult = function(event) {
+                        const cmd = event.results[0][0].transcript.trim().toLowerCase();
+                        addVoiceLog(`您: ${cmd}`);
+                        handleVoiceCmd(cmd);
+                    };
+                    
+                    // 识别结束
+                    speechRecognition.onend = function() {
+                        isVoiceListening = false;
+                        updateVoiceUI(false);
+                        voiceStatus.textContent = '点击麦克风继续说话';
+                    };
+                    
+                    // 识别错误
+                    speechRecognition.onerror = function(event) {
+                        addVoiceLog(`错误: ${event.error}`);
+                        isVoiceListening = false;
+                        updateVoiceUI(false);
+                    };
+                    
+                    speechRecognition.start();
+                }
+            });
+            
+            // 更新语音UI状态
+            function updateVoiceUI(isActive) {
+                if (isActive) {
+                    voiceIcon.classList.add('bg-primary', 'text-white');
+                    voiceIcon.classList.remove('bg-primary/10', 'text-primary');
+                } else {
+                    voiceIcon.classList.remove('bg-primary', 'text-white');
+                    voiceIcon.classList.add('bg-primary/10', 'text-primary');
+                }
+            }
+            
+            // 添加语音日志
+            function addVoiceLog(msg) {
+                if (voiceLog.querySelector('.italic')) voiceLog.innerHTML = '';
+                const logItem = document.createElement('p');
+                logItem.className = 'mb-1 text-xs';
+                logItem.textContent = msg;
+                voiceLog.appendChild(logItem);
+                voiceLog.scrollTop = voiceLog.scrollHeight;
+            }
+            
+            // 处理语音指令
+            function handleVoiceCmd(cmd) {
+                let response = '';
+                
+                // 功率查询
+                if (cmd.includes('功率') || cmd.includes('发电量')) {
+                    const power = document.getElementById('total-power').textContent;
+                    response = `当前总发电功率为${power}`;
+                    document.getElementById('monitoring').scrollIntoView({ behavior: 'smooth' });
+                }
+                // 光伏角度调节
+                else if (cmd.includes('光伏') && cmd.includes('角度')) {
+                    const angleMatch = cmd.match(/\d+/);
+                    if (angleMatch && angleMatch[0] >= 0 && angleMatch[0] <= 90) {
+                        const angle = angleMatch[0];
+                        document.getElementById('pv-angle-val').textContent = `${angle}°`;
+                        response = `已将光伏板角度调整为${angle}度`;
+                    } else {
+                        response = '请说出0-90度之间的角度值';
+                    }
+                }
+                // 生成报告
+                else if (cmd.includes('报告')) {
+                    generateReport();
+                    response = '已为您生成能源报告';
+                }
+                // 未知指令
+                else {
+                    response = '支持指令：查询功率、调节光伏角度、生成报告';
+                }
+                
+                addVoiceLog(`系统: ${response}`);
+                // 语音合成
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(response);
+                    utterance.lang = 'zh-CN';
+                    utterance.rate = 1;
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+        }
+        
+        // 生成能源报告
+        function initReport() {
+            document.getElementById('generate-report-btn').addEventListener('click', generateReport);
+        }
+        
+        function generateReport() {
+            const report = document.getElementById('energy-report');
+            report.classList.remove('hidden');
+            
+            // 填充报告数据
+            document.getElementById('report-date').textContent = `生成时间：${new Date().toLocaleDateString()}`;
+            document.getElementById('rep-total-power').textContent = document.getElementById('total-power').textContent;
+            document.getElementById('rep-self-sufficiency').textContent = document.getElementById('self-sufficiency').textContent;
+            
+            // 滚动到报告
+            report.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>v
+
+
+    </body></html>
+    
